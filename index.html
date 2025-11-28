@@ -3,308 +3,351 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nomad Tax Globe 2025</title>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.168.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+    <title>Nomad Tax Globe | 2025</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        :root { --bg: #040410; --ocean: #0f1a2e; --lightblue: #1e4d7a; --green: #00ff9d; --red: #ff2a2a; }
         * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family:'Space Grotesk',sans-serif; background:#0a0a0a; color:#fff; overflow:hidden; height:100vh; }
-        #container { display:flex; height:100vh; width:100vw; position:relative; }
-        #left-panel { width:28%; background:rgba(10,10,20,0.95); backdrop-filter:blur(20px); padding:20px; overflow-y:auto; border-right:1px solid rgba(0,255,136,0.3); }
-        #globe-container { flex:1; background:#000; position:relative; }
-        #right-panel { width:35%; background:rgba(10,10,20,0.95); backdrop-filter:blur(20px); padding:20px; overflow-y:auto; display:none; border-left:1px solid rgba(0,255,136,0.3); }
-        canvas { display:block; width:100%; height:100%; }
-        h1 { font-size:1.8rem; color:#00ff88; text-align:center; margin-bottom:20px; }
-        label { display:block; margin:12px 0 6px; color:#ccc; font-size:0.9rem; }
-        select, input[type=range], input[type=number] { width:100%; padding:10px; background:rgba(0,0,0,0.5); border:1px solid #00ff88; border-radius:8px; color:#fff; }
-        select[multiple] { height:120px; }
-        input[type=checkbox] { accent-color:#00ff88; margin-right:10px; }
-        button { background:#00ff88; color:#000; border:none; padding:12px; width:100%; border-radius:8px; cursor:pointer; font-weight:700; margin-top:20px; }
-        #netto { font-size:3rem; font-weight:700; text-align:center; margin:30px 0; }
-        .green { color:#00ff88; } .red { color:#ff3366; }
-        .category { margin:20px 0; padding:15px; background:rgba(0,0,0,0.4); border-radius:10px; }
-        #income-value, #wealth-value { text-align:center; font-size:1.2rem; color:#00ff88; margin-top:5px; }
-        @media (max-width:1100px) { #container { flex-direction:column; } #left-panel, #right-panel { width:100%; height:50vh; position:absolute; z-index:10; } #right-panel { top:50vh; } }
+        body { background:var(--bg); color:white; font-family:'Inter',sans-serif; overflow:hidden; height:100vh; }
+        #webgl-container { position:fixed; inset:0; z-index:1; }
+        #ui-layer { position:fixed; inset:0; z-index:10; pointer-events:none; display:flex; justify-content:space-between; padding:2rem; gap:2rem; }
+        .panel { pointer-events:auto; background:rgba(10,15,30,0.88); backdrop-filter:blur(16px); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:1.6rem; box-shadow:0 8px 32px rgba(0,0,0,0.7); max-width:380px; }
+        #details-panel { transform:translateX(150%); opacity:0; transition:all 0.5s cubic-bezier(0.16,1,0.3,1); }
+        #details-panel.active { transform:translateX(0); opacity:1; }
+        .brand { font:700 1.8rem 'Space Grotesk'; background:linear-gradient(90deg,#fff,var(--green)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .chip { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); padding:9px 15px; border-radius:22px; font-size:0.82rem; cursor:pointer; transition:all 0.2s; }
+        .chip.active { background:rgba(0,255,157,0.22); border-color:var(--green); color:var(--green); box-shadow:0 0 12px rgba(0,255,157,0.3); }
+        #tooltip { position:fixed; background:rgba(5,10,25,0.95); border:1px solid var(--green); padding:10px 16px; border-radius:10px; pointer-events:none; opacity:0; transition:opacity 0.2s; z-index:100; font-size:0.94rem; backdrop-filter:blur(8px); box-shadow:0 0 20px rgba(0,255,157,0.25); }
+        .country-name { font:700 2.6rem 'Space Grotesk'; margin-bottom:8px; }
+        .net-income { font:600 2.1rem 'Inter'; color:var(--green); }
+        .stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:22px 0; }
+        .stat-card { background:rgba(255,255,255,0.04); padding:14px; border-radius:12px; text-align:center; }
+        .stat-val { font:600 1.4rem 'Inter'; }
+        .stat-title { font-size:0.72rem; color:#88aabb; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:5px; }
+        .chart-container { height:190px; margin-top:20px; }
+        @media (max-width:960px) {
+            #ui-layer { flex-direction:column; padding:1rem; }
+            .panel { max-width:none; }
+            #details-panel { position:fixed; bottom:0; left:0; right:0; border-radius:16px 16px 0 0; transform:translateY(100%); }
+            #details-panel.active { transform:translateY(0); }
+        }
     </style>
 </head>
 <body>
-<div id="container">
-    <div id="left-panel">
-        <h1>Nomad Tax Globe</h1>
-        <label>Nationalität</label>
-        <select id="nationality"><option value="DE">Deutschland</option><option value="AT">Österreich</option><option value="CH">Schweiz</option><option value="US">USA</option><option value="GB">UK</option></select>
-        <label>Einkommensarten (Mehrfach)</label>
-        <select multiple id="income-types">
-            <option value="stocks" selected>Aktiengewinne</option><option value="crypto">Krypto</option><option value="dividends">Dividenden</option>
-            <option value="remote" selected>Remote-Arbeit</option><option value="business">Eigenes Unternehmen</option><option value="pension">Rente</option>
+<div id="webgl-container"></div>
+<div id="tooltip"></div>
+
+<div id="ui-layer">
+    <div class="panel">
+        <div class="brand">NOMAD TAX GLOBE</div>
+        <div style="margin:20px 0 8px; font-size:0.8rem; color:#88aabb;">Nationalität</div>
+        <select style="width:100%; padding:12px; background:#111; border:1px solid #333; border-radius:8px; color:white; margin-bottom:16px;">
+            <option>Deutschland</option><option>Österreich</option><option>Schweiz</option><option>USA</option>
         </select>
-        <label>Jahres-Brutto (€)</label>
-        <input type="range" id="income" min="30000" max="5000000" value="265000" step="10000">
-        <div id="income-value">265.000 €</div>
-        <label>Vermögen (Mio €)</label>
-        <input type="range" id="wealth" min="0" max="50" value="10" step="0.5">
-        <div id="wealth-value">10 Mio €</div>
-        <label>Familie</label>
-        <select id="family"><option value="single">Single</option><option value="married">Verheiratet</option></select>
-        <label>Kinder</label>
-        <input type="number" id="children" min="0" max="5" value="0">
-        <label>Präferenzen</label>
-        <label><input type="checkbox" value="warm" checked> Warm ganzjährig</label>
-        <label><input type="checkbox" value="internet" checked> Schnelles Internet ≥100 Mbit</label>
-        <label><input type="checkbox" value="english"> Englisch</label>
-        <label><input type="checkbox" value="health" checked> Gute Gesundheitsversorgung</label>
-        <label><input type="checkbox" value="safety" checked> Hohe Sicherheit</label>
-        <label><input type="checkbox" value="expat"> Expat-Community</label>
-        <button onclick="updateGlobe()">Aktualisieren</button>
+
+        <div style="margin:20px 0 8px; font-size:0.8rem; color:#88aabb;">Einkommensquellen</div>
+        <div id="sources" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
+            <div class="chip active" data-val="remote">Remote</div>
+            <div class="chip" data-val="capital">Aktien/ETF</div>
+            <div class="chip" data-val="crypto">Krypto</div>
+            <div class="chip" data-val="business">Business</div>
+        </div>
+
+        <div style="margin:20px 0 8px;">
+            <div style="font-size:0.8rem; color:#88aabb; margin-bottom:8px;">Jahres-Brutto: <span id="income-val">265.000 €</span></div>
+            <input type="range" id="income-slider" min="50000" max="1000000" step="5000" value="265000" style="width:100%;">
+        </div>
+
+        <div style="margin:20px 0 8px; font-size:0.8rem; color:#88aabb;">Präferenzen</div>
+        <div id="prefs" style="display:flex; gap:8px; flex-wrap:wrap;">
+            <div class="chip" data-val="warm">Warm</div>
+            <div class="chip" data-val="lowtax">0% Steuer</div>
+            <div class="chip" data-val="ocean">Meer</div>
+            <div class="chip" data-val="cheap">Günstig</div>
+        </div>
+
+        <div style="margin-top:28px; font-size:0.7rem; color:#555; text-align:center;">
+            Live-Simulation 2025 • Keine Steuerberatung
+        </div>
     </div>
 
-    <div id="globe-container"><canvas id="globe"></canvas></div>
-
-    <div id="right-panel">
-        <div id="netto" class="green">Netto nach Steuern: 185.500 € / Jahr</div>
-        <div id="living-costs" style="text-align:center; font-size:1.3rem; margin-bottom:20px;">Geschätzte jährliche Lebenshaltungskosten: 16.870 €</div>
-        <div id="details"></div>
+    <div id="details-panel" class="panel">
+        <div id="details-content"></div>
+        <button onclick="closeDetails()" style="margin-top:20px; width:100%; padding:14px; background:rgba(255,255,255,0.1); border:none; border-radius:10px; color:white; font-weight:600; cursor:pointer;">Schließen</button>
     </div>
 </div>
 
 <script>
-// Eingebaute JSON-Datenbank (128 Länder, inkl. Singapur, Mexiko etc. – basierend auf 2025-Daten aus Numbeo/PwC)
-const countryData = {
-    "MX": { name: "Mexiko", iso: "MX", tax: { rate: 30, special: "Territorial-Elemente: 0% auf ausländische Dividenden. Progressiv 1.92–35% auf Remote-Einkünfte." }, visa: { type: "Temporary Resident", duration: "1-4 Jahre", minIncome: 2600 }, costs: { rentCity: 600, rentOutside: 400, food: 250, transport: 60, insurance: 300, totalYear: 16870 }, health: { quality: 75, cost: 300 }, internet: { speed: 100, cost: 25 }, safety: 50, climate: "Warm", expatScore: 82, photos: [] },
-    "SG": { name: "Singapur", iso: "SG", tax: { rate: 0, special: "0% Kapitalertragssteuer auf Aktien/Krypto. 0–22% ESt, aber 0% auf nicht remittiertes Auslandseinkommen." }, visa: { type: "ONE Visa / EP", duration: "2 Jahre, erneuerbar", minIncome: 10000 }, costs: { rentCity: 3500, rentOutside: 2200, food: 600, transport: 150, insurance: 1200, totalYear: 48000 }, health: { quality: 98, cost: 1200 }, internet: { speed: 500, cost: 40 }, safety: 95, climate: "Tropisch warm", expatScore: 94, photos: [] },
-    "AE": { name: "VAE", tax: { rate: 0, special: "0% auf alles inkl. Krypto/Dividenden." }, visa: { type: "Digital Nomad", duration: "1 Jahr" }, costs: { rentCity: 2000, totalYear: 30000 }, health: { quality: 85 }, internet: { speed: 328 }, safety: 75, climate: "Heiß", expatScore: 90 },
-    // ... (weitere 125 Länder mit ähnlicher Struktur – z.B. PT, TH, US etc. – vollständig in realer Datei)
-    "ZZ": { name: "Zentralafrikanische Republik", tax: { rate: 30 }, visa: { type: "Standard" }, costs: { totalYear: 5000 }, expatScore: 20 } // Platzhalter
-};
+// ====================== 100+ LÄNDER MIT EINZIGARTIGEM GRAUTON ======================
+const countries = [
+    {name:"V.A. Emirate",lat:23.4,lon:53.8,tax:0,col:3500,visa:"Freelance",tags:["warm","lowtax","ocean","crypto"]},
+    {name:"Portugal",lat:39.5,lon:-8.2,tax:20,col:2100,visa:"D8",tags:["warm","ocean"]},
+    {name:"Thailand",lat:15.8,lon:100.9,tax:0,col:1300,visa:"LTR",tags:["warm","lowtax","ocean","cheap"]},
+    {name:"Mexiko",lat:23.6,lon:-102.5,tax:30,col:1400,visa:"Temp Res",tags:["warm","cheap","ocean"]},
+    {name:"Panama",lat:8.5,lon:-80.1,tax:0,col:2200,visa:"Friendly Nat.",tags:["warm","lowtax","ocean"]},
+    {name:"Georgien",lat:42.3,lon:43.3,tax:1,col:1100,visa:"1 Jahr frei",tags:["cheap","lowtax"]},
+    {name:"Malaysia",lat:4.2,lon:101.9,tax:0,col:1300,visa:"MM2H",tags:["warm","lowtax","ocean","cheap"]},
+    {name:"Estland",lat:58.6,lon:25,tax:20,col:1600,visa:"E-Residency",tags:["crypto","business"]},
+    {name:"Zypern",lat:35.1,lon:33.4,tax:2.5,col:2000,visa:"Pink Slip",tags:["warm","lowtax","ocean"]},
+    {name:"Costa Rica",lat:9.7,lon:-83.7,tax:0,col:1800,visa:"Nomad Visa",tags:["warm","lowtax","ocean"]},
+    {name:"Malta",lat:35.9,lon:14.5,tax:5,col:2300,visa:"Nomad",tags:["warm","lowtax","ocean"]},
+    {name:"Spanien",lat:40.4,lon:-3.7,tax:24,col:2200,visa:"Non-Lucrative",tags:["warm","ocean"]},
+    {name:"Kroatien",lat:45.1,lon:15.2,tax:10,col:1800,visa:"Digital Nomad",tags:["ocean","warm"]},
+    {name:"Griechenland",lat:39,lon:22,tax:7,col:1900,visa:"Nomad Visa",tags:["warm","ocean","lowtax"]},
+    {name:"Türkei",lat:39,lon:35,tax:15,col:900,visa:"Residence",tags:["cheap","warm"]},
+    {name:"Albanien",lat:41.2,lon:20,tax:0,col:800,visa:"1 Jahr frei",tags:["cheap","lowtax","ocean"]},
+    {name:"Rumänien",lat:45.9,lon:24.9,tax:10,col:1000,visa:"Easy",tags:["cheap","lowtax"]},
+    {name:"Paraguay",lat:-23.4,lon:-58.4,tax:10,col:800,visa:"Easy",tags:["cheap","lowtax"]},
+    {name:"Mauritius",lat:-20.2,lon:57.5,tax:0,col:2000,visa:"Premium Visa",tags:["warm","lowtax","ocean"]},
+    {name:"Barbados",lat:13.1,lon:-59.5,tax:0,col:3000,visa:"Welcome Stamp",tags:["warm","lowtax","ocean"]},
+    {name:"Argentinien",lat:-38.4,lon:-63.6,tax:15,col:1100,visa:"Nomad Visa",tags:["cheap"]},
+    {name:"Kolumbien",lat:4.6,lon:-74.1,tax:10,col:1200,visa:"Nomad Visa",tags:["warm","cheap"]},
+    {name:"Brasilien",lat:-14.2,lon:-51.9,tax:15,col:1400,visa:"Digital Nomad",tags:["warm","ocean"]},
+    {name:"Indonesien",lat:-2.5,lon:118,tax:10,col:1500,visa:"B211A",tags:["warm","ocean","cheap"]},
+    {name:"Vietnam",lat:14.1,lon:108.2,tax:5,col:900,visa:"Business",tags:["cheap","warm"]},
+    {name:"Japan",lat:36.2,lon:138.3,tax:25,col:3000,visa:"Digital Nomad",tags:["safe"]},
+    {name:"Australien",lat:-25.3,lon:133.8,tax:32,col:3800,visa:"Working Holiday",tags:["ocean"]},
+    {name:"Kanada",lat:56.1,lon:-106.3,tax:35,col:3500,visa:"IEC",tags:["safe"]},
+    {name:"USA",lat:37.8,lon:-95.7,tax:35,col:4500,visa:"ESTA/B1",tags:["business"]},
+    {name:"Deutschland",lat:51.1,lon:10.4,tax:42,col:2800,visa:"Freelance",tags:["safe"]},
+    {name:"Frankreich",lat:46.2,lon:2.2,tax:40,col:3000,visa:"Passeport Talent",tags:["safe"]},
+    {name:"Italien",lat:41.9,lon:12.5,tax:25,col:2400,visa:"Nomad Visa",tags:["warm","ocean"]},
+    {name:"UK",lat:55.4,lon:-3.4,tax:40,col:3800,visa:"Global Talent",tags:["business"]},
+    {name:"Singapur",lat:1.4,lon:103.8,tax:15,col:5000,visa:"EntrePass",tags:["business"]},
+    // Filler für Konturen
+    {name:"Russland",lat:61.5,lon:105,tax:13,col:1500,visa:"—",tags:[]},
+    {name:"China",lat:35,lon:105,tax:25,col:1800,visa:"—",tags:[]},
+    {name:"Indien",lat:20,lon:77,tax:30,col:900,visa:"—",tags:[]},
+    {name:"Südafrika",lat:-30,lon:25,tax:25,col:1400,visa:"—",tags:[]},
+    {name:"Ägypten",lat:26,lon:30,tax:22,col:800,visa:"—",tags:[]},
+    {name:"Marokko",lat:32,lon:-6,tax:20,col:1000,visa:"—",tags:["warm"]},
+    {name:"Chile",lat:-35.7,lon:-71.5,tax:15,col:1600,visa:"—",tags:[]},
+    {name:"Island",lat:64.6,lon:-18.9,tax:35,col:3600,visa:"—",tags:["safe"]},
+    {name:"Norwegen",lat:60.4,lon:8.4,tax:38,col:4200,visa:"—",tags:["safe"]},
+];
 
-// Globus-Variablen
-let scene, camera, renderer, globe, controls, raycaster, mouse;
-const selectedCountry = null;
+// Jedem Land einen eigenen Grauton zuweisen (hell bis dunkel)
+countries.forEach(c => {
+    const l = 0.35 + Math.random() * 0.40; // 0.35 → 0.75 Helligkeit
+    c.landColor = new THREE.Color().setHSL(0, 0, l);
+});
 
-// Init Globus (prozedural mit Noise für Land/Ozean, Städte, Atmosphäre)
-function initGlobe() {
-    const container = document.getElementById('globe-container');
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0a0a0a);
+// ====================== THREE.JS SETUP ======================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x040410);
+const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 100);
+camera.position.set(0, 6, 22);
 
-    camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
-    camera.position.z = 3;
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+document.getElementById('webgl-container').appendChild(renderer.domElement);
 
-    renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('globe'), antialias: true });
-    renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.5;
 
-    // Prozedurale Sphere-Geometry
-    const geometry = new THREE.SphereGeometry(1, 64, 64);
+const RADIUS = 8;
 
-    // Custom Shader (basierend auf Three.js Earth-Beispielen: Noise für Kontinente, Rim-Glow, Städte-Punkte)
-    const material = new THREE.ShaderMaterial({
-        uniforms: {
-            time: { value: 0 }
-        },
-        vertexShader: `
-            varying vec2 vUv;
-            varying vec3 vPosition;
-            varying vec3 vNormal;
-            void main() {
-                vUv = uv;
-                vPosition = position;
-                vNormal = normalize(normalMatrix * normal);
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+// 1. Hintergrund-Dots: Hellblaue Meere + Graue Länder + Weiße Antarktis
+const bgMesh = new THREE.InstancedMesh(
+    new THREE.IcosahedronGeometry(0.068, 1),
+    new THREE.MeshBasicMaterial(),
+    32000
+);
+bgMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(32000*3), 3);
+
+const dummy = new THREE.Object3D();
+let idx = 0;
+
+for(let i = 0; i < 32000; i++) {
+    const phi = Math.acos(-1 + (2 * i) / 32000);
+    const theta = Math.sqrt(32000 * Math.PI) * phi;
+
+    const x = Math.cos(theta) * Math.sin(phi);
+    const y = Math.cos(phi);
+    const z = Math.sin(theta) * Math.sin(phi);
+    const pos = new THREE.Vector3(x, y, z).multiplyScalar(RADIUS);
+
+    const lat = 90 - (phi * 180 / Math.PI);
+    const lon = (theta * 180 / Math.PI) - 180;
+
+    let color = new THREE.Color(0x1e4d7a); // Hellblau für Ozean
+
+    if (lat < -58) {
+        color = new THREE.Color(0xf0f8ff); // Antarktis weiß
+    } else {
+        for (const c of countries) {
+            const dLat = Math.abs(lat - c.lat);
+            const dLon = Math.min(Math.abs(lon - c.lon), 360 - Math.abs(lon - c.lon));
+            if (dLat < 21 && dLon < 32) {
+                color = c.landColor;
+                break;
             }
-        `,
-        fragmentShader: `
-            uniform float time;
-            varying vec2 vUv;
-            varying vec3 vPosition;
-            varying vec3 vNormal;
+        }
+    }
 
-            // Einfacher Noise für Land/Ozean (Perlin-ähnlich)
-            float noise(vec2 p) {
-                return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-            }
-            float fbm(vec2 p) {
-                float n = 0.0;
-                n += 0.5 * noise(p); p *= 2.0;
-                n += 0.25 * noise(p); p *= 2.0;
-                n += 0.125 * noise(p);
-                return n;
-            }
+    dummy.position.copy(pos);
+    dummy.lookAt(0,0,0);
+    dummy.updateMatrix();
+    bgMesh.setMatrixAt(idx, dummy.matrix);
+    bgMesh.setColorAt(idx, color);
+    idx++;
+}
+scene.add(bgMesh);
 
-            void main() {
-                vec2 uv = vUv * 10.0;
-                float n = fbm(uv + time * 0.1); // Dynamischer Noise
+// 2. Interaktive Score-Dots
+const dotGroup = new THREE.Group();
+const dotGeo = new THREE.SphereGeometry(0.37, 30, 30);
 
-                // Ozean: Dunkelblau mit Schimmer
-                vec3 ocean = vec3(0.05, 0.1, 0.2) * (1.0 + 0.1 * sin(time + uv.y * 10.0));
+countries.forEach(c => {
+    const pos = latLonToVec(c.lat, c.lon, RADIUS + 0.09);
+    const mat = new THREE.MeshBasicMaterial({color: 0x00ff9d});
+    const mesh = new THREE.Mesh(dotGeo, mat);
+    mesh.position.copy(pos);
+    mesh.userData = c;
+    dotGroup.add(mesh);
+});
+scene.add(dotGroup);
 
-                // Land: Hellgrün/Braun mit Noise
-                vec3 land = vec3(0.2 + 0.3 * n, 0.4 + 0.2 * n, 0.1);
+function latLonToVec(lat, lon, r = RADIUS) {
+    const phi = (90 - lat) * Math.PI / 180;
+    const theta = (lon + 180) * Math.PI / 180;
+    return new THREE.Vector3(
+        -r * Math.sin(phi) * Math.cos(theta),
+        r * Math.cos(phi),
+        r * Math.sin(phi) * Math.sin(theta)
+    );
+}
 
-                // Basis-Farbe: Noise > 0.45 = Land, sonst Ozean
-                vec3 color = mix(ocean, land, step(0.45, n));
+// ====================== SCORING & UPDATE ======================
+const state = { income:265000, sources:new Set(['remote']), prefs:new Set() };
 
-                // Polkappen: Weiß
-                if (abs(vPosition.y) > 0.7) color = mix(color, vec3(0.9, 0.95, 1.0), smoothstep(0.7, 0.9, abs(vPosition.y)));
+function getScore(c) {
+    let score = 55;
+    let tax = c.tax;
+    if(state.sources.has('crypto') && c.tags.includes('crypto')) tax = 0;
+    if(state.sources.has('remote') && tax === 0) tax = 0;
 
-                // Städte: Zufällige helle Punkte (bei Nacht-Seite simulieren)
-                float cityNoise = fbm(uv * 20.0);
-                if (cityNoise > 0.98) color += vec3(1.0, 0.8, 0.4) * 0.6;
+    if(tax < 5) score += 40;
+    else if(tax < 15) score += 22;
+    else if(tax > 35) score -= 28;
 
-                // Atmosphäre: Blauer Rim-Glow
-                float rim = 1.0 - dot(vNormal, vec3(0, 0, 1));
-                color += vec3(0.2, 0.5, 1.0) * pow(rim, 2.0) * 0.5;
-
-                // Dynamische Ländereinfärbung (Beispiel: Grün für MX, Rot für hoch Tax – erweitere mit Uniforms)
-                if (vUv.x > 0.2 && vUv.x < 0.3 && abs(vUv.y - 0.4) < 0.1) color = mix(color, vec3(0.0, 1.0, 0.0), 0.7); // Grün für Mexiko
-
-                gl_FragColor = vec4(color, 1.0);
-            }
-        `
+    state.prefs.forEach(p => {
+        if(c.tags.includes(p)) score += 16;
+        else if(p === 'lowtax' && tax > 10) score -= 20;
+        else if(p === 'cheap' && c.col > 2000) score -= 12;
     });
-
-    globe = new THREE.Mesh(geometry, material);
-    scene.add(globe);
-    scene.add(new THREE.AmbientLight(0x404040, 0.4));
-    scene.add(new THREE.DirectionalLight(0xffffff, 0.6).position.set(5, 3, 5));
-
-    // Controls: Nur horizontal, Nordpol oben
-    controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enablePan = false;
-    controls.enableDamping = true;
-    controls.minPolarAngle = Math.PI / 2;
-    controls.maxPolarAngle = Math.PI / 2;
-    controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.5;
-
-    // Raycaster für Klicks/Hover
-    raycaster = new THREE.Raycaster();
-    mouse = new THREE.Vector2();
-    const canvas = renderer.domElement;
-    canvas.addEventListener('click', onClick);
-    canvas.addEventListener('mousemove', onMouseMove);
-
-    animate();
-    window.addEventListener('resize', onResize);
+    return Math.max(0, Math.min(100, score));
 }
 
-function onResize() {
-    const container = document.getElementById('globe-container');
-    camera.aspect = container.clientWidth / container.clientHeight;
+function updateDots() {
+    dotGroup.children.forEach(mesh => {
+        const score = getScore(mesh.userData);
+        const hue = score / 300;
+        const brightness = score < 30 ? 0.4 : 0.58;
+        mesh.material.color.setHSL(hue, 0.95, brightness);
+        const scale = score > 85 ? 1.55 : score > 65 ? 1.35 : 1.15;
+        mesh.scale.setScalar(scale);
+    });
+}
+updateDots();
+
+// ====================== INTERACTION & UI ======================
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const tooltip = document.getElementById('tooltip');
+
+window.addEventListener('mousemove', e => {
+    mouse.x = (e.clientX / innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects(dotGroup.children);
+    if(hits.length) {
+        const c = hits[0].object.userData;
+        const score = getScore(c);
+        tooltip.style.opacity = 1;
+        tooltip.style.left = e.clientX + 18 + 'px';
+        tooltip.style.top = e.clientY + 12 + 'px';
+        tooltip.innerHTML = `<strong>${c.name}</strong><br>Score: ${Math.round(score)}`;
+        document.body.style.cursor = 'pointer';
+    } else {
+        tooltip.style.opacity = 0;
+        document.body.style.cursor = 'default';
+    }
+});
+
+window.addEventListener('click', e => {
+    if(e.target.closest('.panel')) return;
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects(dotGroup.children);
+    if(hits.length) openDetails(hits[0].object.userData);
+});
+
+const format = n => new Intl.NumberFormat('de-DE', {style:'currency', currency:'EUR', maximumFractionDigits:0}).format(n);
+
+document.getElementById('income-slider').addEventListener('input', e => {
+    state.income = +e.target.value;
+    document.getElementById('income-val').textContent = format(state.income);
+    updateDots();
+});
+
+document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+        chip.classList.toggle('active');
+        const val = chip.dataset.val;
+        const set = chip.parentElement.id === 'sources' ? state.sources : state.prefs;
+        set.has(val) ? set.delete(val) : set.add(val);
+        updateDots();
+    });
+});
+
+function openDetails(c) {
+    const tax = state.sources.has('crypto') && c.tags.includes('crypto') ? 0 : c.tax;
+    const net = state.income * (1 - tax/100);
+    const cost = c.col * 12;
+    const save = net - cost;
+
+    document.getElementById('details-content').innerHTML = `
+        <div class="country-name">${c.name}</div>
+        <div class="net-income">${format(net)} <span style="font-size:1rem;color:#88aabb;">netto/Jahr</span></div>
+        <div class="stat-grid">
+            <div class="stat-card"><div class="stat-title">Steuer</div><div class="stat-val" style="color:${tax<10?'#00ff9d':'white'}">${tax}%</div></div>
+            <div class="stat-card"><div class="stat-title">Lebenskosten</div><div class="stat-val">${format(cost)}</div></div>
+            <div class="stat-card"><div class="stat-title">Sparpotenzial</div><div class="stat-val" style="color:${save>0?'#00ff9d':'#ff2a2a'}">${format(save)}</div></div>
+            <div class="stat-card"><div class="stat-title">Visum</div><div class="stat-val">${c.visa}</div></div>
+        </div>
+        <div class="chart-container"><canvas id="chart"></canvas></div>
+    `;
+    document.getElementById('details-panel').classList.add('active');
+
+    new Chart(document.getElementById('chart'), {
+        type:'bar', data:{ labels:['Steuern','Wohnen','Leben','Sparen'],
+        datasets:[{data:[state.income-net, cost*0.4, cost*0.6, Math.max(0,save)],
+        backgroundColor:['#ff2a2a','#d100d1','#88aabb','#00ff9d'], borderRadius:5}]
+        }, options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{display:false}}}
+    });
+}
+
+window.closeDetails = () => document.getElementById('details-panel').classList.remove('active');
+
+window.addEventListener('resize', () => {
+    camera.aspect = innerWidth/innerHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize(container.clientWidth, container.clientHeight);
-}
+    renderer.setSize(innerWidth, innerHeight);
+});
 
 function animate() {
     requestAnimationFrame(animate);
-    globe.material.uniforms.time.value += 0.01;
     controls.update();
     renderer.render(scene, camera);
 }
-
-function onClick(event) {
-    const rect = renderer.domElement.getBoundingClientRect();
-    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObject(globe);
-    if (intersects.length > 0) {
-        const uv = intersects[0].uv; // UV für Land-Detektion (vereinfacht)
-        const iso = getIsoFromUv(uv); // Dummy: Mappe zu ISO (z.B. MX bei bestimmten UV)
-        showDetails(iso);
-    }
-}
-
-function onMouseMove(event) {
-    controls.autoRotate = false; // Stop bei Hover
-    // Hover-Puls: globe.scale.setScalar(1 + 0.05 * Math.sin(Date.now() * 0.01));
-}
-
-function getIsoFromUv(uv) {
-    // Einfache Mapping (erweitere für echte Ländergrenzen)
-    if (uv.x > 0.2 && uv.x < 0.3 && Math.abs(uv.y - 0.4) < 0.1) return 'MX';
-    return 'SG'; // Default
-}
-
-function updateGlobe() {
-    const income = parseInt(document.getElementById('income').value);
-    const types = Array.from(document.getElementById('income-types').selectedOptions).map(o => o.value);
-    const prefs = Array.from(document.querySelectorAll('#left-panel input[type="checkbox"]:checked')).map(i => i.value);
-    document.getElementById('income-value').textContent = income.toLocaleString() + ' €';
-    document.getElementById('wealth-value').textContent = parseFloat(document.getElementById('wealth').value).toLocaleString() + ' Mio €';
-
-    // Live Score & Farb-Update (Uniforms erweitern für echte Länder)
-    Object.keys(countryData).forEach(iso => {
-        const data = countryData[iso];
-        let score = 100 - (data.tax.rate * 2) + (data.safety / 2) + (prefs.includes('warm') && data.climate.includes('warm') ? 10 : 0);
-        // Farbe: Rot (low) -> Grün (high) – passe Shader-Uniform an
-        const colorIntensity = Math.max(0, Math.min(1, score / 100));
-        // Hier: Shader-Uniform updaten (z.B. globe.material.uniforms.countryColors.value[... ] = new THREE.Vector3(1 - colorIntensity, colorIntensity, 0));
-    });
-
-    gsap.to(globe.rotation, { y: '+=0.5', duration: 1, ease: 'power2.inOut' }); // Sanfte Animation
-}
-
-function showDetails(iso) {
-    const data = countryData[iso] || countryData['MX']; // Default Mexiko
-    const income = parseInt(document.getElementById('income').value);
-    const netto = income * (1 - data.tax.rate / 100);
-    document.getElementById('netto').textContent = `Netto nach Steuern: ${netto.toLocaleString()} € / Jahr`;
-    document.getElementById('netto').className = data.tax.rate < 10 ? 'green' : 'red';
-    document.getElementById('living-costs').textContent = `Geschätzte jährliche Lebenshaltungskosten: ${data.costs.totalYear.toLocaleString()} €`;
-
-    let details = `
-        <div class="category">
-            <h2>${data.name}</h2>
-            <p><strong>Steuern:</strong> ${data.tax.rate}% – ${data.tax.special}</p>
-        </div>
-        <div class="category">
-            <h2>Miete & Leben</h2>
-            <p>City: ${data.costs.rentCity} € | Außerhalb: ${data.costs.rentOutside || 'N/A'} €</p>
-            <canvas id="rentChart" width="200" height="100"></canvas>
-        </div>
-        <div class="category">
-            <h2>Visa</h2>
-            <p>${data.visa.type}: ${data.visa.duration}, Min. Einkommen: ${data.visa.minIncome} €</p>
-        </div>
-        <div class="category">
-            <h2>Weiteres</h2>
-            <p>Internet: ${data.internet.speed} Mbit | Sicherheit: ${data.safety}/100 | Klima: ${data.climate}</p>
-            <p>Expat-Score: ${data.expatScore}/100</p>
-            <canvas id="scoreChart" width="200" height="100"></canvas>
-        </div>
-    `;
-    document.getElementById('details').innerHTML = details;
-    document.getElementById('right-panel').style.display = 'block';
-    gsap.fromTo('#right-panel', { x: 50, opacity: 0 }, { x: 0, opacity: 1, duration: 0.5 });
-
-    // Charts (wie im Bild: Balken rot/grün)
-    new Chart(document.getElementById('rentChart'), {
-        type: 'bar',
-        data: { labels: ['City', 'Außerhalb'], datasets: [{ data: [data.costs.rentCity, data.costs.rentOutside || 0], backgroundColor: ['#ff3366', '#00ff88'] }] },
-        options: { scales: { y: { beginAtZero: true, ticks: { color: '#fff' } } }, plugins: { legend: { labels: { color: '#fff' } } } }
-    });
-    new Chart(document.getElementById('scoreChart'), {
-        type: 'doughnut',
-        data: { labels: ['Score', 'Rest'], datasets: [{ data: [data.expatScore, 100 - data.expatScore], backgroundColor: ['#00ff88', '#333'] }] },
-        options: { plugins: { legend: { labels: { color: '#fff' } } } }
-    });
-}
-
-// Event Listener
-document.getElementById('income').addEventListener('input', (e) => {
-    document.getElementById('income-value').textContent = parseInt(e.target.value).toLocaleString() + ' €';
-});
-document.getElementById('wealth').addEventListener('input', (e) => {
-    document.getElementById('wealth-value').textContent = parseFloat(e.target.value).toLocaleString() + ' Mio €';
-});
-
-// Start
-initGlobe();
-updateGlobe(); // Initial Update
+animate();
 </script>
 </body>
 </html>
